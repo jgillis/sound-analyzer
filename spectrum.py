@@ -6,7 +6,7 @@ Based on updating_plot.py
 """
 # Major library imports
 import pyaudio
-from numpy import zeros, linspace, short, fromstring, hstack, transpose
+from numpy import zeros, linspace, short, fromstring, hstack, transpose, hamming, mean
 from scipy import fft
 
 # Enthought library imports
@@ -20,9 +20,22 @@ from enthought.pyface.timer.api import Timer
 # Chaco imports
 from enthought.chaco.api import Plot, ArrayPlotData, HPlotContainer
 
+from enthought.chaco.api import ToolTip
+
 NUM_SAMPLES = 1024
 SAMPLING_RATE = 11025
 SPECTROGRAM_LENGTH = 100
+
+from enable.api import BaseTool
+
+class CustomTool(BaseTool):
+    def normal_mouse_move(self, event):
+        plot = self.component
+        tooltip = filter(lambda x: isinstance(x,ToolTip),plot.overlays)[0]
+        tooltip.x = event.x
+        tooltip.y = event.y
+        [f,a] = plot.map_data((event.x, event.y))
+        tooltip.lines = ["%d Hz" % f]
 
 #============================================================================
 # Create the Chaco plot.
@@ -41,10 +54,14 @@ def _create_plot_component(obj):
     obj.spectrum_plot.padding = 50
     obj.spectrum_plot.title = "Spectrum"
     spec_range = obj.spectrum_plot.plots.values()[0][0].value_mapper.range
-    spec_range.low = 0.0
+    spec_range.low = 0.061
     spec_range.high = 5.0
     obj.spectrum_plot.index_axis.title = 'Frequency (hz)'
     obj.spectrum_plot.value_axis.title = 'Amplitude'
+    obj.spectrum_plot.value_scale = "linear"
+    
+    obj.spectrum_plot.tools.append(CustomTool(obj.spectrum_plot))
+    obj.spectrum_plot.overlays.append(ToolTip(obj.spectrum_plot,lines=["hello"]))
 
     # Time Series plot
     times = linspace(0.0, float(NUM_SAMPLES)/SAMPLING_RATE, num=NUM_SAMPLES)
@@ -97,7 +114,10 @@ def get_audio_data():
                      input=True, frames_per_buffer=NUM_SAMPLES)
     audio_data  = fromstring(_stream.read(NUM_SAMPLES), dtype=short)
     normalized_data = audio_data / 32768.0
-    return (abs(fft(normalized_data))[:NUM_SAMPLES/2], normalized_data)
+    cleared_data = (normalized_data-mean(normalized_data))*hamming(audio_data.shape[0])
+	
+	
+    return (abs(fft(cleared_data))[:NUM_SAMPLES/2], normalized_data)
 
 
 # HasTraits class that supplies the callable for the timer event.
