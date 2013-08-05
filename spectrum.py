@@ -20,7 +20,7 @@ from enthought.pyface.timer.api import Timer
 # Chaco imports
 from enthought.chaco.api import Plot, ArrayPlotData, HPlotContainer
 
-from enthought.chaco.api import ToolTip
+from enthought.chaco.api import ToolTip, PlotGrid
 
 NUM_SAMPLES = 1024
 SAMPLING_RATE = 11025
@@ -36,6 +36,13 @@ class CustomTool(BaseTool):
         tooltip.y = event.y
         [f,a] = plot.map_data((event.x, event.y))
         tooltip.lines = ["%d Hz" % f]
+		
+    def normal_left_down(self, event):
+        plot = self.component
+        [f,a] = plot.map_data((event.x, event.y))
+        grid = filter(lambda x: isinstance(x,PlotGrid),plot.overlays)[0]
+        grid.grid_interval = f
+        plot.title = "Spectrum - base %d Hz" % f
 
 #============================================================================
 # Create the Chaco plot.
@@ -60,9 +67,12 @@ def _create_plot_component(obj):
     obj.spectrum_plot.value_axis.title = 'Amplitude'
     obj.spectrum_plot.value_scale = "linear"
     
-    obj.spectrum_plot.tools.append(CustomTool(obj.spectrum_plot))
-    obj.spectrum_plot.overlays.append(ToolTip(obj.spectrum_plot,lines=["hello"]))
 
+    grid = PlotGrid(mapper=obj.spectrum_plot.index_mapper,component=obj.spectrum_plot,orientation = 'vertical',grid_interval = 5000)
+    obj.spectrum_plot.overlays.append(grid)
+    obj.spectrum_plot.tools.append(CustomTool(obj.spectrum_plot))
+    obj.spectrum_plot.overlays.append(ToolTip(obj.spectrum_plot,lines=[""]))
+	
     # Time Series plot
     times = linspace(0.0, float(NUM_SAMPLES)/SAMPLING_RATE, num=NUM_SAMPLES)
     obj.time_data = ArrayPlotData(time=times)
